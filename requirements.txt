@@ -17,3 +17,6 @@ fastapi
 uvicorn
 markdown
 google-api-python-client
+PyNaCl==1.5.0
+cffi
+
