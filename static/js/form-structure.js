@@ -1,3 +1,8 @@
+module.exports = {
+  field1: "value",
+  field2: "value"
+};
+
 /**
  * Form Structure Utility
  * Handles parsing and preparation of the form structure for the application system
