@@ -22,6 +22,18 @@ from DashboardModules.YouTubeModule import youtube_module
 #from DashboardModules.AutoModModule import automod
 
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_session import Session
+from pymongo import MongoClient
+import os
+
+# Configure before Session(app)
+app.config["SESSION_TYPE"] = "mongodb"
+app.config["SESSION_MONGODB"] = MongoClient(os.environ["MONGO_URI"])
+app.config["SESSION_MONGODB_DB"] = "sessions_db"
+app.config["SESSION_MONGODB_COLLECT"] = "sessions"
+
+Session(app)
+
 
 FILES_URL = "https://files.cyni.quprdigital.tk/upload"
 
