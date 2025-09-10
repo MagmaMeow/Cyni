@@ -1,4 +1,5 @@
 aiohttp
+discord.py
 discord
 flask
 flask-login
@@ -11,6 +12,7 @@ pytz
 sentry-sdk
 waitress
 requests
+requests-oauthlib
 python-decouple
 roblox
 fastapi
@@ -19,4 +21,10 @@ markdown
 google-api-python-client
 PyNaCl==1.5.0
 cffi
-
+httpx
+httpcore
+yarl
+frozenlist
+attrs
+sniffio
+typing-extensions
