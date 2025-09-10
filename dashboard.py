@@ -27,6 +27,30 @@ from pymongo import MongoClient
 import os
 from flask import Flask, session
 from flask_session import Session
+import os
+from flask import Flask
+from flask_session import Session
+from pymongo import MongoClient
+
+app = Flask(__name__)
+
+# Session configuration
+app.config["SESSION_TYPE"] = "mongodb"
+
+# Use the MONGODB_URI from environment
+mongo_uri = os.getenv("MONGODB_URI")
+if not mongo_uri:
+    raise RuntimeError("MONGODB_URI environment variable is not set!")
+
+client = MongoClient(mongo_uri)
+
+app.config["SESSION_MONGODB"] = client
+app.config["SESSION_MONGODB_DB"] = os.getenv("SESSION_MONGODB_DB", "cyni_sessions")
+app.config["SESSION_MONGODB_COLLECT"] = os.getenv("SESSION_MONGODB_COLLECT", "sessions")
+
+# Initialize session
+Session(app)
+
 
 app = Flask(__name__)
 
