@@ -9,25 +9,23 @@ from pymongo import MongoClient
 # Flask App Setup
 # ---------------------------------------------------------
 app = Flask(__name__)
-app.secret_key = os.getenv("TOKEN", "dev_fallback_token")  # Use TOKEN as secret key
+app.secret_key = os.getenv("TOKEN", "dev_fallback_token")
 
 # ---------------------------------------------------------
 # MongoDB + Session Config
 # ---------------------------------------------------------
-app.config["SESSION_TYPE"] = "mongodb"
-
 mongo_uri = os.getenv("MONGODB_URI")
 if not mongo_uri:
     raise RuntimeError("MONGODB_URI environment variable not set!")
 
-# Explicit MongoDB client from Atlas URI
-client = MongoClient(mongo_uri)
+client = MongoClient(mongo_uri)  # ✅ explicit client from Atlas
+
+app.config["SESSION_TYPE"] = "mongodb"
 app.config["SESSION_MONGODB"] = client
 app.config["SESSION_MONGODB_DB"] = os.getenv("SESSION_MONGODB_DB", "cyni_sessions")
 app.config["SESSION_MONGODB_COLLECT"] = os.getenv("SESSION_MONGODB_COLLECT", "sessions")
 
-# Initialize Session
-Session(app)
+Session(app)  # ✅ uses Atlas, not localhost
 
 # ---------------------------------------------------------
 # Flask-Login Setup
@@ -54,14 +52,10 @@ def login():
     if request.method == "POST":
         username = request.form.get("username")
         password = request.form.get("password")
-
-        # Example login logic (replace with real user auth later)
         if username == "admin" and password == "password":
             session["user"] = username
             return redirect(url_for("dashboard"))
-
         return render_template("login.html", error="Invalid credentials")
-
     return render_template("login.html")
 
 @app.route("/dashboard")
