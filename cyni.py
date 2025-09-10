@@ -1,7 +1,6 @@
 import discord
 from discord.abc import User
-from discord.ext import commands
-from discord.ext import tasks
+from discord.ext import commands, tasks
 from utils.mongo import Document
 from utils.constants import BLANK_COLOR
 
@@ -51,6 +50,7 @@ intents.guilds = True
 
 discord.utils.setup_logging(level=logging.INFO)
 
+# --- BOT CLASS ---
 class Bot(commands.AutoShardedBot):
     
     async def close(self):
@@ -59,36 +59,42 @@ class Bot(commands.AutoShardedBot):
         print('Closed!')
 
     async def is_owner(self, user: User) -> bool:
+        return user.id in [
+            1201129677457215558, # coding.nerd
+            707064490826530888, # imlimiteds
+        ]
 
-        if user.id in [
-            1201129677457215558, #coding.nerd
-            707064490826530888, #imlimiteds
-        ]:
-            return True
-        
     def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.mongo = motor.motor_asyncio.AsyncIOMotorClient(os.getenv('MONGO_URI'))
-            self.db = self.mongo["cyni"] if os.getenv("PRODUCTION_TOKEN") else self.mongo["dev"]
-            self.settings_document = Document(self.db, 'settings')
-            self.analytics_document = Document(self.db, 'analytics')
-            self.warnings_document = Document(self.db, 'warnings')
-            self.actvity_document = Document(self.db, 'staff_activity')
-            self.appeals_document = Document(self.db, 'ban_appeals')
-            self.errors_document = Document(self.db, 'errors')
-            self.sessions_document = Document(self.db, 'sessions')
-            self.infraction_log_document = Document(self.db, 'infraction_log')
-            self.infraction_types_document = Document(self.db, 'infraction_types')
-            self.giveaway_document = Document(self.db, 'giveaways')
-            self.backup_document = Document(self.db, 'backup')
-            self.afk_document = Document(self.db,'afk')
-            self.erlc_keys_document = Document(self.db, 'erlc_keys')
-            self.applications_document = Document(self.db, 'applications')
-            self.partnership_document = Document(self.db, 'partnership')
-            self.loa_document = Document(self.db, 'loa')
+        super().__init__(*args, **kwargs)
+        
+        # MongoDB setup
+        MONGODB_URI = os.getenv('MONGODB_URI')
+        if not MONGODB_URI:
+            raise RuntimeError("MONGODB_URI environment variable not set!")
+
+        self.mongo = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URI)
+        self.db = self.mongo["cyni"] if os.getenv("PRODUCTION_TOKEN") else self.mongo["dev"]
+
+        # Documents
+        self.settings_document = Document(self.db, 'settings')
+        self.analytics_document = Document(self.db, 'analytics')
+        self.warnings_document = Document(self.db, 'warnings')
+        self.actvity_document = Document(self.db, 'staff_activity')
+        self.appeals_document = Document(self.db, 'ban_appeals')
+        self.errors_document = Document(self.db, 'errors')
+        self.sessions_document = Document(self.db, 'sessions')
+        self.infraction_log_document = Document(self.db, 'infraction_log')
+        self.infraction_types_document = Document(self.db, 'infraction_types')
+        self.giveaway_document = Document(self.db, 'giveaways')
+        self.backup_document = Document(self.db, 'backup')
+        self.afk_document = Document(self.db,'afk')
+        self.erlc_keys_document = Document(self.db, 'erlc_keys')
+        self.applications_document = Document(self.db, 'applications')
+        self.partnership_document = Document(self.db, 'partnership')
+        self.loa_document = Document(self.db, 'loa')
 
     async def setup_hook(self) -> None:
-
+        # Models
         self.settings = Settings(self.db, 'settings')
         self.analytics = Analytics(self.db, 'analytics')
         self.warnings = Warnings(self.db, 'warnings')
@@ -108,28 +114,14 @@ class Bot(commands.AutoShardedBot):
         self.loa = LOA(self.db, 'loa')
         self.youtube_config = YouTubeConfig(self.db, 'youtube_config')
         
-        Cogs = [m.name for m in iter_modules(['Cogs'],prefix='Cogs.')]
-        Events = [m.name for m in iter_modules(['events'],prefix='events.')]
+        # Load extensions
+        Cogs = [m.name for m in iter_modules(['Cogs'], prefix='Cogs.')]
+        Events = [m.name for m in iter_modules(['events'], prefix='events.')]
         EXT_EXTENSIONS = ["utils.api"]
         UNLOAD_EXTENSIONS = ["Cogs.Tickets", "Cogs.Applications"]
         DISCONTINUED_EXTENSIONS = ["Cogs.Backup"]
 
-
-        for extension in EXT_EXTENSIONS:
-            try:
-                await self.load_extension(extension)
-                logging.info(f'Loaded extension {extension}.')
-            except Exception as e:
-                logging.error(f'Failed to load extension {extension}.', exc_info=True)
-
-        for extension in Cogs:
-            try:
-                await self.load_extension(extension)
-                logging.info(f'Loaded extension {extension}.')
-            except Exception as e:
-                logging.error(f'Failed to load extension {extension}.', exc_info=True)
-
-        for extension in Events:
+        for extension in EXT_EXTENSIONS + Cogs + Events:
             try:
                 await self.load_extension(extension)
                 logging.info(f'Loaded extension {extension}.')
@@ -151,22 +143,18 @@ class Bot(commands.AutoShardedBot):
             except Exception as e:
                 logging.error(f'Failed to unload extension {extension}.', exc_info=True)
 
-        #await self.load_extension("jishaku")
-
+        logging.info("Connected to MongoDB")
         logging.info("Loaded all extensions.")
 
-
-        logging.info("Connected to MongoDB")
-
+        # Start tasks
         change_status.start()
         loa_check.start(self)
         giveaway_roll.start(self)
 
         logging.info(f"Logged in as {bot.user}")
-
         await bot.tree.sync()
 
-
+# --- BOT INSTANCE ---
 bot = Bot(
     command_prefix=get_prefix,
     case_insensitive=True,
@@ -176,11 +164,13 @@ bot = Bot(
     shard_count=1
 )
 
+# --- Other Globals ---
 bot_debug_server = [1152949579407442050]
 bot_shard_channel = 1203343926388330518
-
 afk_users = {}
+up_time = time.time()
 
+# --- EVENTS ---
 @bot.event
 async def on_shard_ready(shard_id):
     embed = discord.Embed(
@@ -199,210 +189,15 @@ async def on_shard_disconnect(shard_id):
     )
     await bot.get_channel(bot_shard_channel).send(embed=embed)
 
-@bot.before_invoke
-async def AutoDefer(ctx: commands.Context):
-    #webhook_link = os.getenv("CYNI_LOGS_WEBHOOK")
-    #embed = discord.Embed(
-    #    title="Command Used",
-    #    description=f"Command `{ctx.command}` used.",
-    #    color=BLANK_COLOR
-    #)
-    #async with aiohttp.ClientSession() as session:
-    #    async with session.post(webhook_link, json={'embeds': [embed.to_dict()]}) as response:
-    #        if response.status == 204:
-    #            return
-    #        else:
-    #            logging.error(f"Failed to send webhook. Status: {response.status}")
-
-    analytics = await bot.analytics.find_by_id(
-        ctx.command.full_parent_name + f"{ctx.command.name}"
-    )
-    if not analytics:
-        await bot.analytics.insert(
-            {
-                "_id": ctx.command.full_parent_name + f"{ctx.command.name}",
-                "uses": 1
-            }
-        )
-    else:
-        await bot.analytics.upsert(
-            {
-                "_id": ctx.command.full_parent_name + f"{ctx.command.name}",
-                "uses": analytics["uses"] + 1
-            }
-        )
-
-#@bot.after_invoke
-#async def loggingCommand(ctx: commands.Context):
-#    logging.info(f"{ctx.author} used {ctx.command} in {ctx.guild}.")
-
+# --- TASKS ---
 @tasks.loop(hours=1)
 async def change_status():
     await bot.wait_until_ready()
-    logging.info("Changing status")
     guild_count = len(bot.guilds)
     status = "Watching over " + str(guild_count) + "+ servers"
-    await bot.change_presence(
-        activity=discord.CustomActivity(name=status)
-    )
+    await bot.change_presence(activity=discord.CustomActivity(name=status))
 
-up_time = time.time()
-
-class PremiumRequired(commands.CheckFailure):
-    def __init__(self, message="<:declined:1268849944455024671> This server doesn't have Cyni Premium!"):
-        self.message = message
-        super().__init__(self.message)
-
-async def staff_check(bot,guild,member):
-    if member.guild_permissions.administrator:
-        return True
-    guild_settings = await bot.settings.get(guild.id)
-    if guild_settings:
-        if "staff_roles" in guild_settings["basic_settings"].keys():
-            if guild_settings["basic_settings"]["staff_roles"] != []:
-                if isinstance(guild_settings["basic_settings"]["staff_roles"], list):
-                    for role in guild_settings["basic_settings"]["staff_roles"]:
-                        if role in [role.id for role in member.roles]:
-                            return True
-            elif isinstance(guild_settings["basic_settings"]["staff_roles"], int):
-                if guild_settings["basic_settings"]["staff_roles"] in [role.id for role in member.roles]:
-                    return True
-    return False
-
-async def management_check(bot,guild,member):
-    if member.guild_permissions.administrator:
-        return True
-    guild_settings = await bot.settings.get(guild.id)
-    if guild_settings:
-        if "management_roles" in guild_settings["basic_settings"].keys():
-            if guild_settings["basic_settings"]["management_roles"] != []:
-                if isinstance(guild_settings["basic_settings"]["management_roles"], list):
-                    for role in guild_settings["basic_settings"]["management_roles"]:
-                        if role in [role.id for role in member.roles]:
-                            return True
-            elif isinstance(guild_settings["basic_settings"]["management_roles"], int):
-                if guild_settings["basic_settings"]["management_roles"] in [role.id for role in member.roles]:
-                    return True
-    return False
-
-async def cad_access_check(bot,guild,member):
-    guild_settings = await bot.settings.get(guild.id)
-    if guild_settings:
-        if "cad_access_roles" in guild_settings["basic_settings"].keys():
-            if guild_settings["basic_settings"]["cad_access_roles"] != []:
-                if isinstance(guild_settings["basic_settings"]["cad_access_roles"], list):
-                    for role in guild_settings["basic_settings"]["cad_access_roles"]:
-                        if role in [role.id for role in member.roles]:
-                            return True
-            elif isinstance(guild_settings["basic_settings"]["cad_access_roles"], int):
-                if guild_settings["basic_settings"]["cad_access_roles"] in [role.id for role in member.roles]:
-                    return True
-    return False
-
-async def cad_operator_check(bot,guild,member):
-    guild_settings = await bot.settings.get(guild.id)
-    if guild_settings:
-        if "cad_operator_roles" in guild_settings["basic_settings"].keys():
-            if guild_settings["basic_settings"]["cad_operator_roles"] != []:
-                if isinstance(guild_settings["basic_settings"]["cad_operator_roles"], list):
-                    for role in guild_settings["basic_settings"]["cad_operator_roles"]:
-                        if role in [role.id for role in member.roles]:
-                            return True
-            elif isinstance(guild_settings["basic_settings"]["cad_operator_roles"], int):
-                if guild_settings["basic_settings"]["cad_operator_roles"] in [role.id for role in member.roles]:
-                    return True
-    return False
-
-async def cad_administrator_check(bot,guild,member):
-    guild_settings = await bot.settings.get(guild.id)
-    if member.guild_permissions.administrator:
-        return True
-    elif guild_settings:
-        if "cad_administrator_roles" in guild_settings["basic_settings"].keys():
-            if guild_settings["basic_settings"]["cad_administrator_roles"] != []:
-                if isinstance(guild_settings["basic_settings"]["cad_administrator_roles"], list):
-                    for role in guild_settings["basic_settings"]["cad_administrator_roles"]:
-                        if role in [role.id for role in member.roles]:
-                            return True
-            elif isinstance(guild_settings["basic_settings"]["cad_administrator_roles"], int):
-                if guild_settings["basic_settings"]["cad_administrator_roles"] in [role.id for role in member.roles]:
-                    return True
-    return False
-
-async def staff_or_management_check(bot,guild,member):
-    if member.guild_permissions.administrator:
-        return True
-    if await staff_check(bot,guild,member) or await management_check(bot,guild,member):
-        return True
-    return False
-
-async def premium_check(bot, guild):
-    guild_settings = await bot.settings.get(guild.id)
-    if guild_settings:
-        try:
-            if "premium" in guild_settings.keys():
-                if guild_settings['premium']['enabled']:
-                    return True
-        except KeyError:
-            return False
-
-def is_staff():
-    async def predicate(ctx):
-        if await staff_check(ctx.bot,ctx.guild,ctx.author):
-            return True
-        raise commands.MissingPermissions(["Staff"])
-    return commands.check(predicate)
-
-def is_management():
-    async def predicate(ctx):
-        if await management_check(ctx.bot,ctx.guild,ctx.author):
-            return True
-        raise commands.MissingPermissions(["Management"])
-    return commands.check(predicate)
-
-def is_staff_or_management():
-    async def predicate(ctx):
-        if await staff_or_management_check(ctx.bot,ctx.guild,ctx.author):
-            return True
-        raise commands.MissingPermissions(["Staff or Management"])
-    return commands.check(predicate)
-
-async def fetch_invite(guild_id):
-    guild = bot.get_guild(guild_id)
-    if not guild:
-        raise ValueError("Guild not found.")
-    
-    try:
-        invite = await guild.vanity_invite()
-        return invite.url
-    except discord.Forbidden:
-        pass
-
-    try:
-        invites = await guild.invites()
-        if invites:
-            return invites[0].url
-    except discord.Forbidden:
-        pass
-
-    try:
-        invite = await guild.text_channels[0].create_invite()
-        return invite.url
-    except discord.Forbidden:
-        raise ValueError("Failed to get invite")
-
-def is_premium():
-    async def predicate(ctx):
-        if await premium_check(ctx.bot, ctx.guild):
-            return True
-        raise PremiumRequired()
-    return commands.check(predicate)
-
-def bot_ready():
-    if bot.is_ready():
-        return True
-    return False
-
+# --- RUN LOGIC ---
 if os.getenv("PRODUCTION_TOKEN"):
     bot_token = os.getenv("PRODUCTION_TOKEN")
     logging.info("Production Token")
@@ -415,10 +210,9 @@ else:
 
 def run_whitelabel_bot(token: str):
     """Run a whitelabel version of the bot using a custom token."""
-    bot_token = token
     logging.info("Running whitelabel bot")
     try:
-        bot.run(bot_token)
+        bot.run(token)
     except Exception as e:
         logging.error(f"Error: {e}", exc_info=True)
 
