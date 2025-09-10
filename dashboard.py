@@ -25,6 +25,15 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_session import Session
 from pymongo import MongoClient
 import os
+from flask import Flask, session
+from flask_session import Session
+
+app = Flask(__name__)
+
+# Example config
+app.config["SESSION_TYPE"] = "mongodb"
+Session(app)
+
 
 # Configure before Session(app)
 app.config["SESSION_TYPE"] = "mongodb"
