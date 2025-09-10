@@ -34,6 +34,27 @@ app.config["SESSION_MONGODB_COLLECT"] = "sessions"
 
 Session(app)
 
+from flask import Flask
+from flask_session import Session
+from pymongo import MongoClient
+import os
+
+app = Flask(__name__)
+
+# --- Flask Config ---
+if "MONGO_URI" in os.environ:
+    # Production: use MongoDB
+    app.config["SESSION_TYPE"] = "mongodb"
+    app.config["SESSION_MONGODB"] = MongoClient(os.environ["MONGO_URI"])
+    app.config["SESSION_MONGODB_DB"] = "sessions_db"
+    app.config["SESSION_MONGODB_COLLECT"] = "sessions"
+else:
+    # Development fallback: filesystem
+    app.config["SESSION_TYPE"] = "filesystem"
+
+# Initialize session after config
+Session(app)
+
 
 FILES_URL = "https://files.cyni.quprdigital.tk/upload"
 
